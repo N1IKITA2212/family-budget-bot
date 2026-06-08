@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: familybudgetbot
+
+telegram:
+  bot:
+    token: ${TELEGRAM_BOT_TOKEN}
+    username: ${TELEGRAM_BOT_USERNAME}
+    allowed-user-ids:
+      - ${TELEGRAM_USER_ID_NIKITA}
+      - ${TELEGRAM_USER_ID_LIZA}
+
+google:
+  sheets:
+    credentials-path: ${GOOGLE_CREDENTIALS_PATH}
+    spreadsheet-id: ${GOOGLE_SPREDSHEET_ID}
