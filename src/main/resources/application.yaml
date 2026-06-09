@@ -13,4 +13,4 @@ telegram:
 google:
   sheets:
     credentials-path: ${GOOGLE_CREDENTIALS_PATH}
-    spreadsheet-id: ${GOOGLE_SPREDSHEET_ID}
+    spreadsheet-id: ${GOOGLE_SPREADSHEET_ID}
