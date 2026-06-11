@@ -1,9 +1,6 @@
 package com.example.familybudgetbot.bot.handler;
 
-import com.example.familybudgetbot.service.CategoryService;
-import com.example.familybudgetbot.service.GoogleSheetsService;
-import com.example.familybudgetbot.service.SessionService;
-import com.example.familybudgetbot.service.UserState;
+import com.example.familybudgetbot.service.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -25,12 +22,16 @@ public class ExpenseHandler implements CommandHandler {
     private final SessionService sessionService;
     private final GoogleSheetsService googleSheetsService;
 
+    private final MessageService messageService;
 
     @Override
     public void handle(Update update) throws TelegramApiException {
         Long userId = update.hasCallbackQuery()
                 ? update.getCallbackQuery().getFrom().getId()
                 : update.getMessage().getFrom().getId();
+        String firstName = update.hasCallbackQuery()
+                ? update.getCallbackQuery().getFrom().getFirstName()
+                : update.getMessage().getFrom().getFirstName();
         if (sessionService.getSession(userId).getState() == UserState.IDLE) {
             askCategoriesAndShowCategoriesButtons(update, userId);
             sessionService.updateState(userId, UserState.WAITING_EXPENSE_CATEGORY);
@@ -44,6 +45,7 @@ public class ExpenseHandler implements CommandHandler {
             boolean success = addExpenseToGoogleSheet(update, category, username);
             if (success) {
                 sessionService.updateState(userId, UserState.IDLE);
+                messageService.sendMainMenu(getChatId(update), firstName);
             }
         }
 

@@ -1,5 +1,6 @@
 package com.example.familybudgetbot.bot.handler;
 
+import com.example.familybudgetbot.service.MessageService;
 import com.example.familybudgetbot.service.SessionService;
 import com.example.familybudgetbot.service.UserState;
 import lombok.RequiredArgsConstructor;
@@ -21,36 +22,17 @@ public class StartHandler implements CommandHandler {
     private static final String SUPPORTS_COMMAND = "/start";
     private final TelegramClient telegramClient;
     private final SessionService sessionService;
+    private final MessageService messageService;
 
     @Override
     public void handle(Update update) throws TelegramApiException {
         sessionService.getSession(update.getMessage().getFrom().getId()).setState(UserState.IDLE);
         SendMessage message = SendMessage.builder()
-                .text("Привет, " + update.getMessage().getFrom().getFirstName() + ", выбери, что ты хочешь сделать")
+                .text("Привет, " + update.getMessage().getFrom().getFirstName() + "! 👋")
                 .chatId(update.getMessage().getChatId())
                 .build();
-
-
-        InlineKeyboardButton button1 = InlineKeyboardButton.builder()
-                .text("💸 Внести траты")
-                .callbackData("enter_expenses")
-                .build();
-
-        InlineKeyboardButton button2 = InlineKeyboardButton.builder()
-                .text("🤑 Внести доходы")
-                .callbackData("enter_income")
-                .build();
-
-        List<InlineKeyboardRow> keyboardRows = List.of(
-                new InlineKeyboardRow(button1),
-                new InlineKeyboardRow(button2)
-        );
-
-        InlineKeyboardMarkup markup = new InlineKeyboardMarkup(keyboardRows);
-
-        message.setReplyMarkup(markup);
-
         telegramClient.execute(message);
+        messageService.sendMainMenu(update.getMessage().getChatId(), update.getMessage().getFrom().getFirstName());
     }
 
     @Override
