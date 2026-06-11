@@ -69,4 +69,16 @@ public class GoogleSheetsService {
                 .map(row -> row.getFirst().toString())
                 .toList();
     }
+
+    public List<List<Object>> readRange(String range) {
+        try {
+            ValueRange result = sheets.spreadsheets().values()
+                    .get(spreadsheetId, range)
+                    .execute();
+            List<List<Object>> values = result.getValues();
+            return values != null ? values : List.of();
+        } catch (IOException e) {
+            throw new GoogleSheetsException(e.getMessage(), e.getCause());
+        }
+    }
 }

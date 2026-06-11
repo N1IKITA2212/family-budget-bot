@@ -32,9 +32,15 @@ public class MessageService {
                 .callbackData("enter_income")
                 .build();
 
+        InlineKeyboardButton button3 = InlineKeyboardButton.builder()
+                .text("📊 Статистика")
+                .callbackData("show_stats")
+                .build();
+
         List<InlineKeyboardRow> keyboardRows = List.of(
                 new InlineKeyboardRow(button1),
-                new InlineKeyboardRow(button2)
+                new InlineKeyboardRow(button2),
+                new InlineKeyboardRow(button3)
         );
 
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup(keyboardRows);
