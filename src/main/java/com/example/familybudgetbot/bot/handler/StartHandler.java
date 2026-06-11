@@ -21,11 +21,10 @@ public class StartHandler implements CommandHandler {
     private static final String SUPPORTS_COMMAND = "/start";
     private final TelegramClient telegramClient;
     private final SessionService sessionService;
-    private static final UserState SUPPORTS_STATE = UserState.IDLE;
 
     @Override
     public void handle(Update update) throws TelegramApiException {
-        sessionService.getSession(update.getMessage().getFrom().getId());
+        sessionService.getSession(update.getMessage().getFrom().getId()).setState(UserState.IDLE);
         SendMessage message = SendMessage.builder()
                 .text("Привет, " + update.getMessage().getFrom().getFirstName() + ", выбери, что ты хочешь сделать")
                 .chatId(update.getMessage().getChatId())
@@ -61,6 +60,6 @@ public class StartHandler implements CommandHandler {
 
     @Override
     public boolean supportsState(UserState userState) {
-        return userState == SUPPORTS_STATE;
+        return false;
     }
 }
