@@ -2,6 +2,7 @@ package com.example.familybudgetbot.bot.handler;
 
 import com.example.familybudgetbot.service.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -16,6 +17,7 @@ import java.util.List;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class IncomeHandler implements CommandHandler {
     private final CategoryService categoryService;
     private final TelegramClient telegramClient;
@@ -33,19 +35,38 @@ public class IncomeHandler implements CommandHandler {
                 : update.getMessage().getFrom().getFirstName();
         if (sessionService.getSession(userId).getState() == UserState.IDLE) {
             askCategoriesAndShowCategoriesButtons(update);
+            log.info("Asked for income categories and shown inline menu");
             sessionService.updateState(userId, UserState.WAITING_INCOME_CATEGORY);
         } else if (sessionService.getSession(userId).getState() == UserState.WAITING_INCOME_CATEGORY) {
-            String category = getCategoryAndAskForIncomeAmount(update);
+            getCategoryAndAskForIncomeAmount(update, userId);
+            log.info("User chosen category {}", update.getCallbackQuery().getData());
             sessionService.updateState(userId, UserState.WAITING_INCOME_AMOUNT);
-            sessionService.updateCategory(userId, category);
         } else if (sessionService.getSession(userId).getState() == UserState.WAITING_INCOME_AMOUNT) {
-            String category = sessionService.getSession(userId).getSelectedCategory();
-            String username = update.getMessage().getFrom().getFirstName();
-            boolean success = addIncomeToGoogleSheet(update, category, username);
+            boolean success = getIncome(update);
             if (success) {
-                sessionService.updateState(userId, UserState.IDLE);
-                messageService.sendMainMenu(getChatId(update), firstName);
+                messageService.askForComment(update);
+                log.info("User entered income and asked for comment");
+                sessionService.updateState(userId, UserState.WAITING_INCOME_COMMENT);
             }
+        } else if (sessionService.getSession(userId).getState() == UserState.WAITING_INCOME_COMMENT) {
+            if (update.hasCallbackQuery() &&
+                    update.getCallbackQuery().getData().equals("no_comment")) {
+                log.info("User pressed no comment button");
+                saveIncome(userId, firstName, "", update);
+                messageService.sendMainMenu(getChatId(update), firstName);
+            } else if (update.hasCallbackQuery() &&
+                    update.getCallbackQuery().getData().equals("add_comment")) {
+                log.info("User pressed add comment button");
+                telegramClient.execute(SendMessage.builder()
+                        .text("Введи комментарий")
+                        .chatId(getChatId(update))
+                        .build());
+                sessionService.updateState(userId, UserState.WAITING_INCOME_COMMENT_INPUT);
+            }
+        } else if (sessionService.getSession(userId).getState() == UserState.WAITING_INCOME_COMMENT_INPUT) {
+            String comment = update.getMessage().getText();
+            saveIncome(userId, firstName, comment, update);
+            messageService.sendMainMenu(getChatId(update), firstName);
         }
     }
 
@@ -56,7 +77,9 @@ public class IncomeHandler implements CommandHandler {
 
     @Override
     public boolean supportsState(UserState userState) {
-        return userState == UserState.WAITING_INCOME_AMOUNT;
+        return userState == UserState.WAITING_INCOME_AMOUNT ||
+                userState == UserState.WAITING_INCOME_COMMENT ||
+                userState == UserState.WAITING_INCOME_COMMENT_INPUT;
     }
 
     private void askCategoriesAndShowCategoriesButtons(Update update) throws TelegramApiException {
@@ -80,27 +103,21 @@ public class IncomeHandler implements CommandHandler {
         telegramClient.execute(message);
     }
 
-    private String getCategoryAndAskForIncomeAmount(Update update) throws TelegramApiException {
+    private void getCategoryAndAskForIncomeAmount(Update update, Long userId) throws TelegramApiException {
         String category = update.getCallbackQuery().getData().split(":")[1];
 
         SendMessage message = SendMessage.builder()
                 .text("Введи сумму")
                 .chatId(getChatId(update))
                 .build();
-
+        sessionService.updateCategory(userId, category);
         telegramClient.execute(message);
-        return category;
     }
 
-    private boolean addIncomeToGoogleSheet(Update update, String category, String username) throws TelegramApiException {
+    private boolean getIncome(Update update) throws TelegramApiException {
         try {
             BigDecimal income = new BigDecimal(update.getMessage().getText());
-            googleSheetsService.addIncome(category, income, username);
-            SendMessage message = SendMessage.builder()
-                    .text("✅ Доход записан!")
-                    .chatId(getChatId(update))
-                    .build();
-            telegramClient.execute(message);
+            sessionService.updateAmount(update.getMessage().getFrom().getId(), income);
             return true;
         } catch (NumberFormatException e) {
             telegramClient.execute(SendMessage.builder()
@@ -116,5 +133,22 @@ public class IncomeHandler implements CommandHandler {
             return update.getCallbackQuery().getMessage().getChatId();
         }
         return update.getMessage().getChatId();
+    }
+
+    private void saveIncome(Long userId, String firstName, String comment, Update update) throws TelegramApiException {
+        googleSheetsService.addIncome(
+                sessionService.getSession(userId).getSelectedCategory(),
+                sessionService.getSession(userId).getAmount(),
+                firstName,
+                comment
+        );
+
+        SendMessage message = SendMessage.builder()
+                .text("✅ Доход записан!")
+                .chatId(getChatId(update))
+                .build();
+
+        telegramClient.execute(message);
+        sessionService.updateState(userId, UserState.IDLE);
     }
 }

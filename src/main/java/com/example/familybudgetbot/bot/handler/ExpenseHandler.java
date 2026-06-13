@@ -2,6 +2,7 @@ package com.example.familybudgetbot.bot.handler;
 
 import com.example.familybudgetbot.service.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -16,6 +17,7 @@ import java.util.List;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class ExpenseHandler implements CommandHandler {
     private final CategoryService categoryService;
     private final TelegramClient telegramClient;
@@ -34,21 +36,40 @@ public class ExpenseHandler implements CommandHandler {
                 : update.getMessage().getFrom().getFirstName();
         if (sessionService.getSession(userId).getState() == UserState.IDLE) {
             askCategoriesAndShowCategoriesButtons(update, userId);
+            log.info("Запрошены категории трат и выведено меню с кнопками категорий");
             sessionService.updateState(userId, UserState.WAITING_EXPENSE_CATEGORY);
         } else if (sessionService.getSession(userId).getState() == UserState.WAITING_EXPENSE_CATEGORY) {
-            String category = getCategoryAndAskForExpenseAmount(update, userId);
+            getCategoryAndAskForExpenseAmount(update, userId);
+            log.info("Пользователь выбрал категорию {}", update.getCallbackQuery().getData());
             sessionService.updateState(userId, UserState.WAITING_EXPENSE_AMOUNT);
-            sessionService.updateCategory(userId, category);
         } else if (sessionService.getSession(userId).getState() == UserState.WAITING_EXPENSE_AMOUNT) {
-            String category = sessionService.getSession(userId).getSelectedCategory();
-            String username = update.getMessage().getFrom().getFirstName();
-            boolean success = addExpenseToGoogleSheet(update, category, username);
+            boolean success = getExpense(update);
             if (success) {
-                sessionService.updateState(userId, UserState.IDLE);
-                messageService.sendMainMenu(getChatId(update), firstName);
+                messageService.askForComment(update);
+                log.info("Пользователь ввел трату успешно и ему предложена возможность ввести комментарий");
+                sessionService.updateState(userId, UserState.WAITING_EXPENSE_COMMENT);
             }
+        } else if (sessionService.getSession(userId).getState() == UserState.WAITING_EXPENSE_COMMENT) {
+            if (update.hasCallbackQuery() &&
+                    update.getCallbackQuery().getData().equals("no_comment")) {
+                log.info("Пользователь нажал на кнопку пропустить");
+                saveExpense(userId, firstName, "", update);
+                sessionService.updateComment(userId, "");
+                messageService.sendMainMenu(getChatId(update), firstName);
+            } else if (update.hasCallbackQuery() &&
+                    update.getCallbackQuery().getData().equals("add_comment")) {
+                log.info("Пользователь выбрал ввести комментарий");
+                telegramClient.execute(SendMessage.builder()
+                        .text("Введи комментарий")
+                        .chatId(getChatId(update))
+                        .build());
+                sessionService.updateState(userId, UserState.WAITING_EXPENSE_COMMENT_INPUT);
+            }
+        } else if (sessionService.getSession(userId).getState() == UserState.WAITING_EXPENSE_COMMENT_INPUT) {
+            String comment = update.getMessage().getText();
+            saveExpense(userId, firstName, comment, update);
+            messageService.sendMainMenu(getChatId(update), firstName);
         }
-
     }
 
     @Override
@@ -58,7 +79,9 @@ public class ExpenseHandler implements CommandHandler {
 
     @Override
     public boolean supportsState(UserState userState) {
-        return userState == UserState.WAITING_EXPENSE_AMOUNT;
+        return userState == UserState.WAITING_EXPENSE_AMOUNT ||
+                userState == UserState.WAITING_EXPENSE_COMMENT ||
+                userState == UserState.WAITING_EXPENSE_COMMENT_INPUT;
     }
 
     private void askCategoriesAndShowCategoriesButtons(Update update, Long userId) throws TelegramApiException {
@@ -83,26 +106,21 @@ public class ExpenseHandler implements CommandHandler {
         telegramClient.execute(message);
     }
 
-    private String getCategoryAndAskForExpenseAmount(Update update, Long userId) throws TelegramApiException {
+    private void getCategoryAndAskForExpenseAmount(Update update, Long userId) throws TelegramApiException {
         String category = update.getCallbackQuery().getData().split(":")[1];
 
         SendMessage message = SendMessage.builder()
                 .text("Введи сумму")
                 .chatId(getChatId(update))
                 .build();
+        sessionService.updateCategory(userId, category);
         telegramClient.execute(message);
-        return category;
     }
 
-    private boolean addExpenseToGoogleSheet(Update update, String category, String username) throws TelegramApiException {
+    private boolean getExpense(Update update) throws TelegramApiException {
         try {
             BigDecimal expense = new BigDecimal(update.getMessage().getText());
-            googleSheetsService.addExpense(category, expense, username);
-            SendMessage message = SendMessage.builder()
-                    .text("✅ Трата записана!")
-                    .chatId(getChatId(update))
-                    .build();
-            telegramClient.execute(message);
+            sessionService.updateAmount(update.getMessage().getFrom().getId(), expense);
             return true;
         } catch (NumberFormatException e) {
             telegramClient.execute(SendMessage.builder()
@@ -118,5 +136,21 @@ public class ExpenseHandler implements CommandHandler {
             return update.getCallbackQuery().getMessage().getChatId();
         }
         return update.getMessage().getChatId();
+    }
+
+    private void saveExpense(Long userId, String firstName, String comment, Update update) throws TelegramApiException {
+        googleSheetsService.addExpense(
+                sessionService.getSession(userId).getSelectedCategory(),
+                sessionService.getSession(userId).getAmount(),
+                firstName,
+                comment
+        );
+        SendMessage message = SendMessage.builder()
+                .text("✅ Трата записана!")
+                .chatId(getChatId(update))
+                .build();
+
+        telegramClient.execute(message);
+        sessionService.updateState(userId, UserState.IDLE);
     }
 }

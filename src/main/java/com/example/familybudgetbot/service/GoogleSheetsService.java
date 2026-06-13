@@ -40,15 +40,15 @@ public class GoogleSheetsService {
         }
     }
 
-    public void addExpense(String category, BigDecimal amount, String username) {
+    public void addExpense(String category, BigDecimal amount, String username, String comment) {
         String date = LocalDate.now().format(DATE_FORMATTER);
-        List<List<Object>> values = List.of(List.of(date, category, amount, username, ""));
+        List<List<Object>> values = List.of(List.of(date, category, amount, username, comment));
         appendToSheet(EXPENSES_SHEET, values);
     }
 
-    public void addIncome(String category, BigDecimal amount, String username) {
+    public void addIncome(String category, BigDecimal amount, String username, String comment) {
         String date = LocalDate.now().format(DATE_FORMATTER);
-        List<List<Object>> values = List.of(List.of(date, category, amount, username, ""));
+        List<List<Object>> values = List.of(List.of(date, category, amount, username, comment));
         appendToSheet(INCOME_SHEET, values);
     }
 

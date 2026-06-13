@@ -3,6 +3,7 @@ package com.example.familybudgetbot.service;
 
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -20,5 +21,13 @@ public class SessionService {
 
     public void updateCategory(Long userId, String category) {
         sessions.get(userId).setSelectedCategory(category);
+    }
+
+    public void updateAmount(Long userId, BigDecimal amount) {
+        sessions.get(userId).setAmount(amount);
+    }
+
+    public void updateComment(Long userId, String comment) {
+        sessions.get(userId).setComment(comment);
     }
 }

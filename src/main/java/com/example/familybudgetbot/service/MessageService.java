@@ -3,6 +3,7 @@ package com.example.familybudgetbot.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardRow;
@@ -47,5 +48,39 @@ public class MessageService {
 
         message.setReplyMarkup(markup);
         telegramClient.execute(message);
+    }
+
+    public void askForComment(Update update) throws TelegramApiException {
+        SendMessage message = SendMessage.builder()
+                .text("Добавить комментарий?")
+                .chatId(getChatId(update))
+                .build();
+
+        InlineKeyboardButton button1 = InlineKeyboardButton.builder()
+                .text("✅ Добавить ")
+                .callbackData("add_comment")
+                .build();
+        InlineKeyboardButton button2 = InlineKeyboardButton.builder()
+                .text("⏭️ Пропустить")
+                .callbackData("no_comment")
+                .build();
+
+        List<InlineKeyboardRow> rows = List.of(
+                new InlineKeyboardRow(button1),
+                new InlineKeyboardRow(button2)
+        );
+
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup(rows);
+
+        message.setReplyMarkup(markup);
+
+        telegramClient.execute(message);
+    }
+
+    private Long getChatId(Update update) {
+        if (update.hasCallbackQuery()) {
+            return update.getCallbackQuery().getMessage().getChatId();
+        }
+        return update.getMessage().getChatId();
     }
 }
