@@ -33,5 +33,5 @@ build/
 .vscode/
 
 ### secrets ###
-src/main/resources/credentials.json
+credentials.json
 .env

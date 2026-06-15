@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,7 +29,7 @@ public class GoogleSheetsConfig {
     public Sheets sheetsService() throws IOException, GeneralSecurityException {
         final NetHttpTransport HTTP_TRANSPORT = GoogleNetHttpTransport.newTrustedTransport();
         GoogleCredentials credentials;
-        try (InputStream in = GoogleSheetsConfig.class.getResourceAsStream(credentialsFilePath)) {
+        try (InputStream in = new FileInputStream(credentialsFilePath)) {
             if (in == null) {
                 throw new FileNotFoundException("Resource not found: " + credentialsFilePath);
             }
