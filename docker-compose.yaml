@@ -1,0 +1,7 @@
+services:
+  app:
+    image: n1ikita23/family-budget-bot:latest
+    env_file: .env
+    volumes:
+      - ./credentials.json:/app/credentials.json
+    restart: unless-stopped
